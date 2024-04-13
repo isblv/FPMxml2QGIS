@@ -1,0 +1,8 @@
+[general]
+name=XML to QGIS 
+qgisMinimumVersion=3.0
+version=0.2
+
+email=sobolev.ilya.alexandrovich@gmail.com
+
+description=Плагин для обработки xml-документов с данными государственного лесопатологического мониторинга. A plugin to convert XML data to GeoCSV
