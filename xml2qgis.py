@@ -1,7 +1,8 @@
 import os
 from qgis.PyQt.QtWidgets import QAction, QFileDialog, QToolBar
 from qgis.core import QgsVectorLayer, QgsField, QgsFeature, QgsGeometry, QgsPointXY, QgsProject
-#from PyQt5.QtWidgets import QAction, QCheckBox
+from PyQt5.QtWidgets import QAction, QCheckBox
+#from PyQt5.QtWidgets import QCheckBox
 from PyQt5.QtCore import QVariant, QSettings
 #from PyQt5.QtGui import QIcon
 import xml.etree.ElementTree as ET
@@ -26,6 +27,8 @@ class XML2QGISPlugin:
 
         # Создание временной директории
         self.temp_dir = tempfile.mkdtemp()
+
+        self.checkboxUseAdditionalInfoAction = None  # Добавляем атрибут checkboxUseAdditionalInfoAction
 
         # Путь к файлу Excel с лесными стратами (+ районами, зонами ЛПУ и т.д.) (Приложение 1)
         self.excel_file_path = os.path.join(cmd_folder, "Приложение 1.xlsx")
@@ -56,7 +59,23 @@ class XML2QGISPlugin:
         self.iface.addPluginToMenu("&"+_name, self.actionOpenArchives)
         self.iface.addPluginToMenu("&"+_name, self.actionOpenExcel)
 
-        self.iface.messageBar().pushMessage('Инструменты плагина '+_name+' загружены в панель инструментов')
+
+        # Создать действие для использования дополнительной информации
+        self.checkboxUseAdditionalInfoAction = QAction("Подеревная", self.iface.mainWindow())
+        self.checkboxUseAdditionalInfoAction.setCheckable(True)
+        self.checkboxUseAdditionalInfoAction.setChecked(False)  # Начальное значение чекбокса
+
+        # Привязать действие к слоту, который будет вызываться при изменении состояния чекбокса
+        self.checkboxUseAdditionalInfoAction.triggered.connect(self.onCheckboxStateChanged)
+
+        # Добавить действие в панель инструментов
+        self.toolbar.addAction(self.checkboxUseAdditionalInfoAction)
+
+        # Добавить действие в меню плагина
+        self.iface.addPluginToMenu("&" + _name, self.checkboxUseAdditionalInfoAction)
+
+        self.iface.messageBar().pushMessage('Инструменты плагина ' + _name + ' загружены в панель инструментов')
+
 
     def unload(self):        
         # Удаление действий из панели инструментов при выгрузке плагина
@@ -64,6 +83,44 @@ class XML2QGISPlugin:
         self.iface.removePluginMenu("&"+_name, self.actionOpenFolders)
         self.iface.removePluginMenu("&"+_name, self.actionOpenArchives)
         self.iface.removePluginMenu("&"+_name, self.actionOpenExcel)
+        '''self.iface.removePluginMenu("&"+_name, self.checkboxUseAdditionalInfo)
+
+        # Удалить чекбокс из панели инструментов
+        self.toolbar.removeAction(self.checkboxUseAdditionalInfoAction)
+
+        # Удаление действий из панели инструментов при выгрузке плагина
+        self.toolbar.removeAction(self.actionOpenXmlFiles)
+        self.toolbar.removeAction(self.actionOpenFolders)
+        self.toolbar.removeAction(self.actionOpenArchives)
+        self.toolbar.removeAction(self.actionOpenExcel)
+        
+        # Очистка панели инструментов
+        self.toolbar.clear()
+
+        # Удаление чекбокса
+        self.toolbar.removeAction(self.checkboxUseAdditionalInfoAction)
+
+        # Очистить указатели на элементы интерфейса
+        self.actionOpenXmlFiles = None
+        self.actionOpenFolders = None
+        self.actionOpenArchives = None
+        self.actionOpenExcel = None
+        self.checkboxUseAdditionalInfo = None'''
+
+        # Удалить действие из меню плагина при выгрузке плагина
+        self.iface.removePluginMenu("&" + _name, self.checkboxUseAdditionalInfoAction)
+        # Очистить панель инструментов
+        del self.checkboxUseAdditionalInfoAction
+        self.toolbar.clear()
+
+    def onCheckboxStateChanged(self):
+        # Обработка изменения состояния чекбокса
+        if self.checkboxUseAdditionalInfoAction.isChecked():
+            # Чекбокс отмечен
+            print("Использование дополнительной информации включено")
+        else:
+            # Чекбокс не отмечен
+            print("Использование дополнительной информации выключено")
 
     def open_xml_files(self):
         # Открыть диалоговое окно для выбора XML-файлов
@@ -119,16 +176,36 @@ class XML2QGISPlugin:
     def process_files(self, xml_files):
         if not xml_files:
             return
+        
+        # Создать новый слой (новый метод обработки в зависимости от значения чекбокса)
+        if self.checkboxUseAdditionalInfoAction.isChecked():
+            layer = self.create_layer_with_additional_info()
+            if layer is None:
+                print("Не удалось создать слой")
+                return
+            # Обработать каждый XML-файл и добавить объекты на слой
+            for xml_file in xml_files:
+                print(f"Обработка файла: {xml_file}")
+                self.process_xml_file_with_additional_info(xml_file, layer)
+        else:
+            layer = self.create_layer()
+            if layer is None:
+                print("Не удалось создать слой")
+                return
+            # Обработать каждый XML-файл и добавить объекты на слой
+            for xml_file in xml_files:
+                print(f"Обработка файла: {xml_file}")
+                self.process_xml_file(xml_file, layer)
 
         # Создать новый слой
-        layer = self.create_layer()
+        '''layer = self.create_layer()
         if layer is None:
             print("Не удалось создать слой")
             return
 
         # Обработать каждый XML-файл и добавить объекты на слой
         for xml_file in xml_files:
-            self.process_xml_file(xml_file, layer)
+            self.process_xml_file(xml_file, layer)'''
 
         # Добавить слой в проект
         self.layers.append(layer)
@@ -136,7 +213,7 @@ class XML2QGISPlugin:
 
     def create_layer(self):
         # Создать новый векторный слой
-        layer = QgsVectorLayer("Point", "XML Layer", "memory")
+        layer = QgsVectorLayer("Point", "XML ППН", "memory")
         if not layer.isValid():
             return None
         provider = layer.dataProvider()
@@ -144,7 +221,8 @@ class XML2QGISPlugin:
                                 QgsField("path_area", QVariant.Double),
                                 QgsField("tax_info", QVariant.String),
                                 QgsField("strata", QVariant.String),
-                                QgsField("tree_count", QVariant.Int)])
+                                QgsField("tree_count", QVariant.Int),
+                                QgsField("s_strata", QVariant.Double)])
         layer.updateFields()
         return layer
 
@@ -156,7 +234,9 @@ class XML2QGISPlugin:
 
             # Получить данные из XML
             path_area = float(root.find('.//_taxation/_path_area').text)
-            strata = self.assign_excel_values(xml_file)
+            strata, s_strata = self.assign_excel_values(xml_file)  # Извлекаем и название страты, и s_strata
+            if s_strata is not None:
+                s_strata = round(s_strata, 1)
 
             tax_info_list = []
             for tax_tree in root.findall('.//_taxation/_taxTrees/TaxTree'):
@@ -176,11 +256,344 @@ class XML2QGISPlugin:
             provider = layer.dataProvider()
             feature = QgsFeature()
             feature.setGeometry(QgsGeometry.fromPointXY(QgsPointXY(lon, lat)))
-            feature.setAttributes([xml_file, path_area, tax_info, strata, tree_count])
-            provider.addFeature(feature)
+            feature.setAttributes([xml_file, path_area, tax_info, strata, tree_count, s_strata])
+            if provider.addFeature(feature):
+                print(f"Объект добавлен на слой: {feature.attributes()}")
+            else:
+                print(f"Не удалось добавить объект на слой: {feature.attributes()}")
         except ET.ParseError as e:
             # Вывод сообщения об ошибке разбора XML
             print(f"Ошибка при парсинге xml-файла {xml_file}: {e}")
+
+
+
+
+    def create_layer_with_additional_info(self):
+        # Создать новый векторный слой с дополнительной информацией
+        layer = QgsVectorLayer("Point", "XML Деревья", "memory")
+        if not layer.isValid():
+            return None
+        provider = layer.dataProvider()
+        provider.addAttributes([QgsField("Путь xml-файла", QVariant.String),
+                                
+                                QgsField("ID", QVariant.String),
+                                QgsField("Дата таксации", QVariant.String),
+                                QgsField("Широта", QVariant.String),
+                                QgsField("Долгота", QVariant.String),
+                                QgsField("ВНУМ", QVariant.String),
+                                QgsField("Субъект", QVariant.String),
+                                QgsField("Лесничество", QVariant.String),
+                                QgsField("Уч. лесничество", QVariant.String),
+                                QgsField("Участок, урочище и т.п.", QVariant.String),
+                                QgsField("Квартал", QVariant.String),
+                                QgsField("Выдел", QVariant.String),
+                                QgsField("Лп. выдел", QVariant.String),
+                                QgsField("Площадь выдела", QVariant.String),
+                                QgsField("Площадь лп. выдела", QVariant.String),
+                                QgsField("Исполнитель", QVariant.String),
+                                QgsField("Номер ППН", QVariant.String),
+
+                                QgsField("ТХ / Непокрытые лесом (катег.)", QVariant.String),
+                                QgsField("ТХ / Категория защитности", QVariant.String),
+                                QgsField("ТХ / Состав", QVariant.String),
+                                QgsField("ТХ / Ярус", QVariant.String),
+                                QgsField("ТХ / Полнота", QVariant.String),
+                                QgsField("ТХ / Бонитет", QVariant.String),
+                                QgsField("ТХ / Тип леса", QVariant.String),
+                                QgsField("ТХ / Запас , дес. м3/га", QVariant.String),
+                                QgsField("ПП / Тип ПП", QVariant.String),
+                                QgsField("ПП / Число деревьев", QVariant.String),
+                                QgsField("Страта", QVariant.String),
+                                QgsField("ЭЛ / Главная порода", QVariant.String),
+                                QgsField("ЭЛ / Доля участия породы", QVariant.String),
+                                QgsField("ЭЛ / Возраст", QVariant.String),
+                                QgsField("ЭЛ / Высота", QVariant.String),
+                                QgsField("ЭЛ / Диаметр", QVariant.String),
+                                QgsField("ПО / Причина 1", QVariant.String),
+                                QgsField("ПО / Причина 2", QVariant.String),
+                                QgsField("ПО / Причина 3", QVariant.String),
+                                QgsField("ПО / Причина 4", QVariant.String),
+                                QgsField("Аренда (Да/Нет)", QVariant.String),
+                                QgsField("Аренда (Примечание)", QVariant.String),
+
+                                QgsField("Д / Номер", QVariant.String),
+                                QgsField("Д / Порода", QVariant.String),
+                                QgsField("Д / Диаметр", QVariant.String),
+                                QgsField("Д / Высота", QVariant.String),
+                                QgsField("Д / Категория состояния", QVariant.String),
+                                QgsField("Д / Ярус", QVariant.String),
+                                QgsField("Д / Класс урожайности", QVariant.String),
+
+                                QgsField("Признак повреждения 1", QVariant.Int),
+                                QgsField("Признак повреждения 2", QVariant.Int),
+                                QgsField("Признак повреждения 3", QVariant.Int),
+                                QgsField("Признак повреждения 4", QVariant.Int),
+                                QgsField("Признак повреждения 5", QVariant.Int),
+                                QgsField("Причина повреждения 1", QVariant.Int),
+                                QgsField("Причина повреждения 2", QVariant.Int),
+                                QgsField("Причина повреждения 3", QVariant.Int),
+                                QgsField("Причина повреждения 4", QVariant.Int),
+                                QgsField("Причина повреждения 5", QVariant.Int),
+
+                                QgsField("Примечание (к дереву)", QVariant.String),
+                                QgsField("Примечание (к выделу)", QVariant.String),
+                                QgsField("GV", QVariant.String),
+                                QgsField("Площадь ППН", QVariant.String),
+                                QgsField("Площадь страты", QVariant.String),
+                                QgsField("Количество живых деревьев", QVariant.String),
+                                QgsField("Высота породы", QVariant.String),
+                                QgsField("Радиус ППН", QVariant.String),
+
+                                QgsField("h_vost1", QVariant.Double),
+                                QgsField("v_tree", QVariant.Double)])
+        layer.updateFields()
+        return layer
+
+    def process_xml_file_with_additional_info(self, xml_file, layer):
+
+        try:
+                
+            # Попытка разобрать XML-файл
+            tree = ET.parse(xml_file)
+            root = tree.getroot()
+
+            # Получить данные из XML
+            path_area = float(root.find('.//_taxation/_path_area').text)
+
+            strata = None
+            s_strata = None
+            #strata, s_strata = self.assign_excel_values(xml_file)  # Извлекаем и название страты, и s_strata
+            if s_strata is not None:
+                s_strata = round(s_strata, 1)
+
+            tax_info_list = []
+            for tax_tree in root.findall('.//_taxation/_taxTrees/TaxTree'):
+                coef = tax_tree.find('_coef').text
+                species = tax_tree.find('_species').text
+                if coef == "0":
+                    coef = "+"
+                tax_info_list.append(coef + species)
+            tax_info = "".join(tax_info_list)
+            lat = float(root.find('.//_gpsData/_lat').text)
+            lon = float(root.find('.//_gpsData/_lon').text)
+
+            # Извлечение дополнительной информации
+            tax_species = root.find('.//_taxation/_taxTrees/TaxTree/_species').text
+            tax_coef = root.find('.//_taxation/_taxTrees/TaxTree/_coef').text
+            tax_age = root.find('.//_taxation/_taxTrees/TaxTree/_age').text
+            tax_h = root.find('.//_taxation/_taxTrees/TaxTree/_h').text
+            tax_d = root.find('.//_taxation/_taxTrees/TaxTree/_d').text
+            dam1 = root.find('.//_header/_mainDamages').text
+            
+            # Обработка всех элементов _Damages
+            dam2_elements = root.findall('.//_header/_Damages[1]')
+            dam2 = dam2_elements[0].text if dam2_elements else None
+            
+            dam3_elements = root.findall('.//_header/_Damages[2]')
+            dam3 = dam3_elements[0].text if dam3_elements else None
+            
+            dam4_elements = root.findall('.//_header/_Damages[3]')
+            dam4 = dam4_elements[0].text if dam4_elements else None
+
+            arenda_date = root.find('.//_header/_tenantry/_tenantryTo').text
+            lpt_date = root.find('.//_header/_gpsData/_lpt_date').text
+            arenda = arenda_date >= lpt_date
+            arenda_info = f"c {arenda_date} по {lpt_date}" if arenda else None
+
+            r_ppn = root.find('.//_header/_plot/_r').text
+            s_ppn = round((math.pi * (float(root.find('.//_header/_plot/_r').text) **2))/10000, 3)
+
+            # Получить все деревья в XML-файле
+            all_trees = root.findall('.//_trees/Tree')
+
+            tree_count = len(all_trees)  # Подсчет количества деревьев
+            # Подсчитать число деревьев с _stateCategory < 5
+            LTrees = sum(1 for tree in all_trees if int(tree.find('_stateCategory').text) < 5)
+
+            # Извлекаем необходимые данные из корневого элемента XML-файла
+            file_id = root.find('.//_header/_id').text
+            lpt_date = root.find('.//_header/_gpsData/_lpt_date').text
+            lat = float(root.find('.//_header/_gpsData/_lat').text)
+            lon = float(root.find('.//_header/_gpsData/_lon').text)
+            altitude = float(root.find('.//_header/_gpsData/_altitude').text)
+            region = root.find('.//_header/_region').text
+            forestry = root.find('.//_header/_forestry').text
+            forestry_area = root.find('.//_header/_forestryArea').text
+            sub_forestry = root.find('.//_header/_subForestry').text
+            kvartal = root.find('.//_header/_kvartal').text
+            patch = root.find('.//_header/_patch').text
+            forest_pathology_section = root.find('.//_header/_forestPatologySection').text
+            path_area = float(root.find('.//_taxation/_path_area').text)
+            forest_pathology_section_s = root.find('.//_header/_forestPatologySectionS').text
+            worker = root.find('.//_header/_worker').text
+            _n = root.find('.//_n')
+            _n = _n.text if _n is not None else None
+
+            _tax1 = root.find('.//_taxation/_notForestType')
+            _tax1 = _tax1.text if _tax1 is not None else None
+            _tax2 = root.find('.//_taxation/_landuse').text
+            _tax3 = tax_info
+            _tax4 = root.find('.//taxation/TaxTree/_layer')
+            _tax4 = _tax4.text if _tax4 is not None else None
+            _tax5 = root.find('.//_taxation/_density').text
+            _tax6 = root.find('.//_taxation/_bonitet').text
+            _tax7 = root.find('.//_taxation/_forest_type').text
+            _tax8 = root.find('.//_taxation/_stock').text
+
+            _pp = root.find('.//_header/_blankType').text
+            _nTrees = tree_count
+            _strata = root.find('.//_taxation/_strata').text
+            if _strata is None:
+                _strata = strata
+
+            _el1 = tax_species
+            _el2 = tax_coef
+            _el3 = tax_age
+            _el4 = tax_h
+            _el5 = tax_d
+
+            _dmg1 = dam1
+            _dmg2 = dam2
+            _dmg3 = dam3
+            _dmg4 = dam4
+
+            _arnd1 = arenda
+            _arnd2 = arenda_info
+
+            # Деревья (подеревная информация)
+
+            _desc = root.find('.//_header/_description')
+            _desc = _desc.text if _desc is not None else None
+            _gv = root.find('.//_header/_gpsData/_gpsDataType').text
+            _sPPN = s_ppn
+            _sStrata = s_strata
+            # Число живых деревьев
+            # Высота породы
+            _rPPN = r_ppn
+    
+
+            # Обработать каждое дерево Tree
+            provider = layer.dataProvider()  # Переместим создание провайдера за пределы цикла
+            for tree_element in root.findall('.//_trees/Tree'):
+                # Получить номер и породу дерева
+                tree_number = tree_element.find('_n').text
+                tree_species = tree_element.find('_species').text
+                tree_d = tree_element.find('_d').text
+                tree_h = tree_element.find('_h').text
+                tree_sc = int(tree_element.find('_stateCategory').text)
+                tree_l = tree_element.find('_layer').text
+                tree_pc = tree_element.find('_productivityClass').text
+
+                desc = tree_element.find('.//_trees/Tree/_description')
+                desc = desc.text if desc is not None else None
+                
+                # Найти такую же породу в разделе TaxTree
+                tax_tree_species = root.find(f".//_taxation/_taxTrees/TaxTree[_species='{tree_species}']")
+                # Если находим такую же породу, извлекаем значение высоты
+                if tax_tree_species is not None:
+                    _hSpecies = float(tax_tree_species.find('_h').text)
+                else:
+                    _hSpecies = None  # Или другое значение по умолчанию, если не найдено                
+                
+                # Извлечение признаков и причин для каждого дерева
+                priznaki = []
+                prichiny = []
+                for item in tree_element.findall('_weakAppearance/item'):
+                    priznak = item.find('key/int').text
+                    prichina = item.find('value/int').text
+                    priznaki.append(priznak)
+                    prichiny.append(prichina)
+                # Заполнение пустых значений, если их меньше 5
+                priznaki.extend([None] * (5 - len(priznaki)))
+                prichiny.extend([None] * (5 - len(prichiny)))
+
+                # Высота восстановленная (по породам и ярусам по известным высотам)
+                h_vost1 = self.calculate_average_height(root, tree_species, tree_l)
+                if h_vost1 is not None:
+                    h_vost1 = round(h_vost1,1)
+
+                if tree_h is None:
+                    tree_h = h_vost1
+
+                tree_svet = ['ОС','Б','С','ДН','ОЛС','ИВ','Р','ОЛ','Л','Я','Д','ЯБ','ОР','ГШ']
+                tree_ten = ['Е','КЛ','ЛП','ОЛЧ','В','Ч','К','П','ЛЩ','КРУ']
+                if tree_species in tree_svet:
+                    tree_svet_coef = 0.4
+                elif tree_species in tree_ten:
+                    tree_svet_coef = 0.42
+                else:
+                    tree_svet_coef = 0.41
+
+                tree_g = math.pi/4*(int(tree_d)/100)**2
+                # Проверяем, что tree_h не равен None, не равен 0 и не пустая строка
+                if tree_h is not None and tree_h != 0 and str(tree_h).strip():
+                    tree_v = (float(tree_h)+3)*tree_svet_coef*tree_g
+                # Проверяем, что _hSpecies не равен None, не равен 0 и не пустая строка
+                elif _hSpecies is not None and _hSpecies != 0 and str(_hSpecies).strip():
+                    tree_v = (float(_hSpecies)+3)*tree_svet_coef*tree_g
+                else:
+                    tree_v = None
+                    
+                
+                tree_v = round(tree_v,4)
+
+                # Создать объект на слой для каждого дерева
+                feature = QgsFeature()
+                feature.setGeometry(QgsGeometry.fromPointXY(QgsPointXY(lon, lat)))
+                feature.setAttributes([
+                    xml_file, 
+                
+                    file_id, lpt_date, lat, lon, altitude, region, forestry,
+                    forestry_area, sub_forestry, kvartal, patch, forest_pathology_section,
+                    path_area, forest_pathology_section_s, worker, _n,
+                    _tax1, _tax2, _tax3, _tax4, _tax5, _tax6, _tax7, _tax8, 
+                    _pp, _nTrees, _strata,
+                    _el1, _el2, _el3, _el4, _el5,
+                    _dmg1, _dmg2, _dmg3, _dmg4,
+                    _arnd1, _arnd2,
+
+                    tree_number, tree_species, tree_d, tree_h, tree_sc, tree_l, tree_pc,
+                    *priznaki, *prichiny,
+                    desc,
+
+                    _desc, _gv, _sPPN, _sStrata, LTrees, _hSpecies, _rPPN,
+                    
+                    
+                    h_vost1, tree_v
+                ])
+
+                # Попытка добавления объекта на слой
+                if provider.addFeature(feature):
+                    print(f"Объект добавлен на слой: {feature.attributes()}")
+                else:
+                    print(f"Не удалось добавить объект на слой: {feature.attributes()}")
+
+            print(f"Обработка файла {xml_file} завершена")
+        except ET.ParseError as e:
+            # Вывод сообщения об ошибке разбора XML
+            print(f"Ошибка при парсинге xml-файла {xml_file}: {e}")
+
+
+    def calculate_average_height(self, root, species, layer):
+        heights = []
+        for tree_element in root.findall('.//_trees/Tree'):
+            tree_species = tree_element.find('_species').text
+            tree_layer = tree_element.find('_layer').text
+            tree_height = tree_element.find('_h')
+            if tree_species == species and tree_layer == layer and tree_height is not None and tree_height.text.strip() != '' and tree_height.text.strip() != '0':
+                heights.append(float(tree_height.text))
+        if heights:
+            return sum(heights) / len(heights)
+        else:
+            return None
+
+
+
+
+
+
+
+
 
 
     def get_xml_files_in_folder(self, folder_path):
@@ -287,18 +700,19 @@ class XML2QGISPlugin:
             root = tree.getroot()
             _n_value = root.find('.//_n').text
             
-            # Ищем значение _n в столбце K и получаем соответствующее значение из столбца L
-            for row in ws.iter_rows(min_row=2, max_col=12, max_row=ws.max_row):  # Начинаем с 2 строки, так как первая строка - заголовки
+            # Ищем значение _n в столбце K и получаем соответствующее значение из столбца L и M
+            for row in ws.iter_rows(min_row=2, max_col=13, max_row=ws.max_row):  # Начинаем с 2 строки, так как первая строка - заголовки
                 if row[10].value == _n_value:
-                    excel_value = row[11].value
-                    return excel_value
+                    excel_strata = row[11].value
+                    excel_s_strata = row[12].value
+                    return excel_strata, excel_s_strata
 
             # Если значение _n не найдено в файле Excel, выводим предупреждение
             print(f"ППН под номером {_n_value} не найдена в таблице страт (Приложение 1)")
-            return None
+            return None, None
         except Exception as e:
             print(f"Ошибка при присвоении значений из Excel: {e}")
-            return None
+            return None, None
 
 
 #Делаем слой точек ППН сразу по таблицам страт (Приложение 1) (предполагаем, что он (excel файл с таблицей страт) есть у пользователя в исходных данных, в корне плагина)
@@ -377,7 +791,9 @@ class XML2QGISPlugin:
                     feature.setGeometry(QgsGeometry.fromPointXY(point))
 
                     # Получаем значения "Площадь" и "Название" страты из Excel, а также другие данные
-                    area_value = row[12].value  # Колонка M
+                    area_value = row[12].value
+                    if area_value is not None:
+                        area_value = round(area_value,1)  # Колонка M
                     name_value = row[11].value  # Колонка L
 
                     #Регион, зона ЛПУ и лесной район
