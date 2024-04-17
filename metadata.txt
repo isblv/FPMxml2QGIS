@@ -1,5 +1,5 @@
 [general]
-name=XML to QGIS 
+name=FPM.XML to QGIS 
 qgisMinimumVersion=3.0
 version=0.2
 
