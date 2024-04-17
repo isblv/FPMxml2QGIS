@@ -3,6 +3,9 @@ name=XML to QGIS
 qgisMinimumVersion=3.0
 version=0.2
 
+author=Соболев Илья Александрович, Карминов Виктор Николаевич,
 email=sobolev.ilya.alexandrovich@gmail.com
+repository=https://github.com/isblv/xml2qgis.git
 
-description=Плагин для обработки xml-документов с данными государственного лесопатологического мониторинга. A plugin to convert XML data to GeoCSV
+description=Импорт данных ГЛПМ (ППН) в формате .xml в QGIS
+about=Плагин для обработки документов в формате .xml с данными государственного лесопатологического мониторинга, собранными на постоянных пробных площадях.
