@@ -1,7 +1,7 @@
 [general]
 name=FPM.XML to QGIS 
 qgisMinimumVersion=3.0
-version=0.21
+version=0.2
 
 author=Соболев Илья Александрович, Карминов Виктор Николаевич,
 email=sobolev.ilya.alexandrovich@gmail.com
