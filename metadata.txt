@@ -3,7 +3,7 @@ name=FPM.XML to QGIS
 qgisMinimumVersion=3.0
 version=0.2
 
-authors=Соболев Илья Александрович, Карминов Виктор Николаевич,
+author=Соболев Илья Александрович, Карминов Виктор Николаевич,
 email=sobolev.ilya.alexandrovich@gmail.com
 repository=https://github.com/isblv/xml2qgis.git
 
